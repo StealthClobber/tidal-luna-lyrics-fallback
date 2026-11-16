@@ -22,15 +22,6 @@ The panel:
 
 2. The store appears in the list. Click **@stealth/lyrics-fallback** in it to install.
 
-## Developing
-
-```
-pnpm install
-pnpm run watch
-```
-
-This builds into `dist/` on every change and serves it on port 3000 for Luna's dev plugin loading.
-
 ## Settings
 
 | Setting | Default | What it does |
