@@ -2,15 +2,9 @@
 
 A [Tidal Luna](https://github.com/Inrixia/TidaLuna) plugin that shows lyrics when TIDAL's own don't show up.
 
-TIDAL's current client only shows its **Lyrics** button in the now-playing view when the track is linked to lyrics on TIDAL's side, so many tracks get none. This plugin replaces TIDAL's **Lyrics** tab with its own, for every track: same place (beside **Credits**), same look, but with synced lyrics from [LRCLIB](https://lrclib.net), and TIDAL's own for tracks LRCLIB doesn't have.
+TIDAL's current client only shows its **Lyrics** in the now-playing view when the track is linked to lyrics on TIDAL's side, so many tracks get none at all. This plugin replaces TIDAL's **Lyrics** tab with its own, for every track: same place (beside **Credits**), same look, but with synced lyrics from [LRCLIB](https://lrclib.net), and TIDAL's own for tracks LRCLIB doesn't have.
 
-The lyrics show where TIDAL's own would be: in its side panel, with the cover moved left. (TIDAL only makes room for that panel while one of its tabs is open, so the plugin keeps TIDAL's own Lyrics tab, or else **Credits**, open underneath, hidden, and turns it off when you close the lyrics.)
-
-The panel:
-
-- Uses lyrics from [LRCLIB](https://lrclib.net), a free open lyrics database, and TIDAL's own for tracks LRCLIB doesn't have. (TIDAL's can come first instead, but their timings are often off.)
-- Looks like TIDAL's own lyrics view. With synced lyrics it highlights the line being sung and scrolls along; click a line to jump to it, or scroll yourself and it stops following for a few seconds.
-- Follows the track as songs change, and loads the next track's lyrics before it starts.
+I've also found TIDAL's lyrics to be improperly synced sometimes when LRCLIB's aren't, so that's an added benefit of replacing them with LRCLIB.
 
 ## Installing
 
