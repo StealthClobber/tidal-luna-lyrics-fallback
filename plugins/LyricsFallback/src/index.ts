@@ -15,6 +15,8 @@ export const storage = await ReactiveStore.getPluginStorage("LyricsFallback", {
 });
 
 export { Settings } from "./Settings";
+/** Exported so the lookups can be tried from TIDAL's developer console. */
+export { fromLrclib, fromTidal };
 
 /** Our Lyrics tab replaces TIDAL's: this class on the page hides TIDAL's Lyrics buttons. */
 document.body.classList.add("lf-replace");
@@ -49,29 +51,60 @@ const TAB_SETTLE = 2000;
 const SOURCE_TIMEOUT = 10000;
 const cache = new Map<string, Promise<Lyrics | undefined>>();
 
-/** The track's lyrics: TIDAL's, then LRCLIB's (or the other way round). Undefined if neither has any. */
+type LyricsSource = (mediaItem: MediaItem) => Promise<Lyrics | undefined>;
+
+/**
+ * How good a result is, so the best of the sources can be picked: a higher
+ * number wins, and equal numbers keep the preferred source (LRCLIB, or TIDAL
+ * with "TIDAL's lyrics first" on). Synced lyrics must rank highest of all:
+ * the sources stop being asked as soon as one has them.
+ */
+export const lyricsRank = (lyrics: Lyrics): number => {
+	if (lyrics.synced) return 4;
+	// Real words beat LRCLIB's "instrumental" flag, which is crowd-submitted and sometimes wrong.
+	// A plain result of only a line or two is usually a stub ("[Instrumental]", one hook line),
+	// so it ranks below the flag: a known instrumental shows a clear message instead.
+	const sung = lyrics.lines.filter((line) => line.text.trim() !== "").length;
+	if (sung >= MIN_PLAIN_LINES) return 3;
+	if (lyrics.instrumental) return 2;
+	return sung > 0 ? 1 : 0;
+};
+/** Fewer non-empty lines than this and plain lyrics count as a stub. */
+const MIN_PLAIN_LINES = 3;
+
+/**
+ * Asks the sources in order and keeps the best result by lyricsRank, stopping
+ * at the first synced one. Undefined if none has lyrics; an error only if none
+ * has lyrics and one of them failed (a dropped connection), so it's retried.
+ */
+export const pickLyrics = async (sources: LyricsSource[], mediaItem: MediaItem): Promise<Lyrics | undefined> => {
+	let best: Lyrics | undefined;
+	let failure: unknown;
+	for (const source of sources) {
+		try {
+			// A source that hangs mustn't keep the next one from being tried.
+			const found = await Promise.race([
+				source(mediaItem),
+				new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`${source.name} timed out`)), SOURCE_TIMEOUT)),
+			]);
+			if (!found) continue;
+			if (best === undefined || lyricsRank(found) > lyricsRank(best)) best = found;
+			if (found.synced) break;
+		} catch (error) {
+			failure = error;
+			trace.warn.withContext(`Getting lyrics from ${source.name || "a source"}`)(error);
+		}
+	}
+	if (best) return best;
+	if (failure) throw failure;
+};
+
+/** The track's lyrics: synced ones from either source, preferring LRCLIB (or TIDAL), else plain ones. */
 const lyricsFor = (mediaItem: MediaItem) => {
 	const key = String(mediaItem.id);
 	let lyrics = cache.get(key);
 	if (lyrics === undefined) {
-		lyrics = (async () => {
-			const sources = storage.tidalFirst ? [fromTidal, fromLrclib] : [fromLrclib, fromTidal];
-			let failure: unknown;
-			for (const source of sources) {
-				try {
-					// A source that hangs mustn't keep the next one from being tried.
-					const found = await Promise.race([
-						source(mediaItem),
-						new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`${source.name} timed out`)), SOURCE_TIMEOUT)),
-					]);
-					if (found) return found;
-				} catch (error) {
-					failure = error;
-					trace.warn.withContext(`Getting lyrics from ${source.name}`)(error);
-				}
-			}
-			if (failure) throw failure;
-		})();
+		lyrics = pickLyrics(storage.tidalFirst ? [fromTidal, fromLrclib] : [fromLrclib, fromTidal], mediaItem);
 		cache.set(key, lyrics);
 		// Don't keep failures (a dropped connection), so opening the panel again retries.
 		lyrics.catch(() => cache.delete(key));

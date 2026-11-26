@@ -133,21 +133,45 @@ export const fromLrclib = async (mediaItem: MediaItem): Promise<Lyrics | undefin
 		...(duration ? { duration: String(Math.round(duration)) } : {}),
 	});
 	const exactLyrics = exact && fromLrclibTrack(exact);
-	if (exactLyrics) return exactLyrics;
+	// A synced exact match is the best there is. An exact instrumental is kept as it is:
+	// the search below uses the bare title and would find the vocal version's lyrics.
+	if (exactLyrics?.synced || exactLyrics?.instrumental) return exactLyrics;
 
-	const results = (await lrclib<LrclibTrack[]>("search", { track_name: item.title, artist_name: artist })) ?? [];
+	// The exact match can be plain text while a synced copy of the song is listed
+	// under a slightly different title or album, which only the search finds.
+	let results: LrclibTrack[];
+	try {
+		results = (await lrclib<LrclibTrack[]>("search", { track_name: item.title, artist_name: artist })) ?? [];
+	} catch (error) {
+		// Lyrics already in hand beat an error from the extra lookup.
+		if (exactLyrics) return exactLyrics;
+		throw error;
+	}
 	const wanted = simplify(item.title);
+	const lengthOff = (track: LrclibTrack) => (duration ? Math.abs(track.duration - duration) : 0);
 	const candidates = results
 		.filter((track) => simplify(track.trackName) === wanted || simplify(track.trackName).startsWith(wanted))
 		// Within 10s of TIDAL's length, if TIDAL gave one.
-		.filter((track) => !duration || Math.abs(track.duration - duration) <= 10)
-		.sort((a, b) => {
-			// Synced lyrics first, then the closest length.
-			const synced = Number(!!b.syncedLyrics) - Number(!!a.syncedLyrics);
-			return synced || (duration ? Math.abs(a.duration - duration) - Math.abs(b.duration - duration) : 0);
-		});
+		.filter((track) => lengthOff(track) <= SEARCH_LENGTH_SLACK)
+		// Synced lyrics first, then the closest length.
+		.sort((a, b) => Number(!!b.syncedLyrics) - Number(!!a.syncedLyrics) || lengthOff(a) - lengthOff(b));
+
+	// Replacing a plain exact match needs a synced copy of the same cut (nearly the same length):
+	// another cut's timings could be worse than TIDAL's own.
+	const syncedSlack = exactLyrics ? UPGRADE_LENGTH_SLACK : SEARCH_LENGTH_SLACK;
+	for (const track of candidates) {
+		const lyrics = fromLrclibTrack(track);
+		if (lyrics?.synced && lengthOff(track) <= syncedSlack) return lyrics;
+	}
+	// No synced copy: the exact match, else the best plain search result.
+	if (exactLyrics) return exactLyrics;
 	for (const track of candidates) {
 		const lyrics = fromLrclibTrack(track);
 		if (lyrics) return lyrics;
 	}
 };
+
+/** How far (seconds) a search result's length may be from TIDAL's to count as the same song. */
+const SEARCH_LENGTH_SLACK = 10;
+/** How far it may be to replace a plain exact match with its synced lyrics: the same cut, give or take rounding. */
+const UPGRADE_LENGTH_SLACK = 2;

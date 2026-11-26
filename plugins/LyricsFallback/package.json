@@ -1,6 +1,6 @@
 {
 	"name": "@stealth/lyrics-fallback",
-	"description": "Replaces TIDAL's Lyrics tab with synced lyrics from LRCLIB, or TIDAL's own when LRCLIB has none.",
+	"description": "Replaces TIDAL's Lyrics tab with synced lyrics from LRCLIB, or TIDAL's own when LRCLIB has no synced ones.",
 	"author": {
 		"name": "StealthClobber"
 	},

@@ -20,7 +20,7 @@ export const Settings = () => {
 			/>
 			<LunaSwitchSetting
 				title="TIDAL's lyrics first"
-				desc="Use TIDAL's own lyrics when it has them, and LRCLIB otherwise. Off: LRCLIB first, with TIDAL's for tracks LRCLIB doesn't have (TIDAL's timings are often off)."
+				desc="Prefer TIDAL's own lyrics over LRCLIB's. Synced lyrics win over plain ones either way. Off: LRCLIB first (TIDAL's timings are often off)."
 				checked={tidalFirst}
 				onChange={(_: unknown, checked: boolean) => {
 					setTidalFirst((storage.tidalFirst = checked));
